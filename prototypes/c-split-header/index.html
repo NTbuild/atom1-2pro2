@@ -1,0 +1,601 @@
+<!doctype html>
+<!--
+  nomada toast: a split website header with two intro loaders.
+  01 Deal: red cards are dealt from a deck one by one; each is tossed, flips over to a reel and lands in the arc
+  with a recoil. The hand breathes, the studio fades in behind it and the arc folds into a two-row drum that
+  springs into the right column while the copy comes in on the left.
+  02 Ring: cards lay into a tumbling 3D ring one after another, then it rights itself, the camera pushes in and
+  the ring splits into the same drum.
+  One file, plain HTML/CSS/JS, motion on damped springs. Each reel's poster crossfades into its clip on hover,
+  keyboard focus or tap.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0D0C0B">
+<title>Tino Mendes · nomada toast</title>
+<meta name="description" content="Tino Mendes makes short vertical reels for AI and creative tools.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0D0C0B;--ink2:#171412;--paper:#F3EFE8;--mute:rgba(243,239,232,.62);--line:rgba(243,239,232,.16);--red:#E33131;--gut:clamp(16px,1.9vw,28px);--navh:clamp(60px,8vh,76px);--colgap:clamp(24px,3.2vw,52px);--big:3.1;--hs:clamp(40px,min(6.9vw,11.4vh),132px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--paper);overflow:hidden;overscroll-behavior:none}
+body{font-family:'Inter Tight',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+.mono{font-family:'DM Mono',ui-monospace,monospace}
+
+#stage{position:fixed;inset:0;overflow:hidden;--fade:1;--ui:0;--ui2:0;--ui3:0;--tags:0;--win:0}
+/* the panel holds the studio backdrop and the cards; in the hero it springs into the right column */
+#panel{position:absolute;left:0;top:0;width:100%;height:100%;z-index:1;overflow:hidden;background:var(--ink2);user-select:none;-webkit-user-select:none;will-change:left,top,width,height}
+#panel::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(243,239,232,calc(var(--win) * .09));z-index:3}
+#stage.live #panel{cursor:grab;touch-action:pan-y}
+#stage.live.dragging #panel{cursor:grabbing}
+#sky{position:absolute;left:-4%;top:-4%;width:108%;height:108%;object-fit:cover;opacity:0;filter:brightness(.8) saturate(1.2);will-change:transform,opacity;pointer-events:none}
+.shade{position:absolute;inset:0;pointer-events:none;background:radial-gradient(70% 62% at 50% 50%,rgba(13,12,11,0) 40%,rgba(13,12,11,.62));opacity:var(--win)}
+.wcap{position:absolute;z-index:2;left:14px;top:14px;margin:0;display:flex;align-items:center;gap:8px;padding:7px 11px 7px 9px;border-radius:999px;background:rgba(13,12,11,.55);font:500 10.5px/1 'DM Mono',ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);opacity:var(--ui3);pointer-events:none}
+.wcap b{font-weight:500;color:var(--paper)}
+.wcap img{width:11px;height:11px}
+
+/* cards: a reel poster up front, its clip underneath, the red back behind */
+.card{position:absolute;left:0;top:0;padding:0;margin:0;border:0;background:none;border-radius:var(--r,10px);transform-style:preserve-3d;cursor:inherit;-webkit-tap-highlight-color:transparent}
+.card:focus-visible{outline-offset:5px}
+.face{position:absolute;inset:0;border-radius:var(--r,10px);overflow:hidden;background:#221e1b;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 16px 36px rgba(0,0,0,.42);container-type:size}
+.face::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);pointer-events:none}
+.face img,.face video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;-webkit-user-drag:none}
+.face video{opacity:0;transition:opacity .5s ease}
+.card.on .face video{opacity:1}
+.face.back{transform:rotateY(180deg);background:var(--red) url(../../assets/img/nav-mark-white.png) center/36% auto no-repeat}
+.face.back::after{inset:6%;border-radius:calc(var(--r,10px) * .55);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+.tag{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;gap:6cqw;padding:26cqw 7cqw 7cqw;background:linear-gradient(rgba(10,9,8,0),rgba(10,9,8,.82));text-align:left;opacity:var(--tags)}
+.tag span:first-child{display:flex;flex-direction:column;gap:2.4cqw;min-width:0}
+.tag b{font:700 clamp(8px,7cqw,17px)/1 'Inter Tight',sans-serif;letter-spacing:-.01em;color:#fff}
+.tag i{font:500 clamp(6px,4.3cqw,10.5px)/1.15 'DM Mono',ui-monospace,monospace;font-style:normal;letter-spacing:.05em;text-transform:uppercase;color:rgba(243,239,232,.72)}
+.pl{position:relative;flex:none;width:clamp(16px,13cqw,30px);height:clamp(16px,13cqw,30px);border-radius:50%;background:rgba(255,255,255,.18);transition:background .3s}
+.pl::before{content:'';position:absolute;left:54%;top:50%;transform:translate(-50%,-50%);border-style:solid;border-width:.3em 0 .3em .5em;border-color:transparent transparent transparent #fff;font-size:clamp(8px,6cqw,14px)}
+.card.on .pl{background:var(--red)}
+.card.on .pl::before{left:50%;width:.42em;height:.6em;border:0;border-left:.13em solid #fff;border-right:.13em solid #fff}
+
+/* 01 deal */
+#deal{position:absolute;inset:0}
+/* 02 ring */
+#scene{position:absolute;inset:0}
+#ring{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}
+
+/* nav */
+.nav{position:absolute;z-index:6;left:0;right:0;top:0;height:var(--navh);display:flex;align-items:center;gap:clamp(18px,2.4vw,36px);padding:0 var(--gut)}
+.logo{margin-right:auto;display:block;align-self:flex-start;margin-top:calc((var(--navh) - 36px) / 2);transform-origin:0 0;transform:scale(calc(var(--big) - (var(--big) - 1) * var(--ui)))}
+.logo img{display:block;height:36px;width:auto}
+.links{display:flex;gap:clamp(18px,2vw,30px);font-size:14px;font-weight:500}
+.links a{opacity:.7;transition:opacity .2s}
+.links a:hover{opacity:1}
+.links,.navcta,.menu{opacity:var(--ui);transform:translateY(calc((1 - var(--ui)) * -8px))}
+.btn{display:inline-flex;align-items:center;gap:.6em;height:50px;padding:0 24px;border-radius:999px;font-weight:600;font-size:15px;letter-spacing:-.005em;white-space:nowrap;transition:background .2s,box-shadow .2s,transform .2s}
+.btn.red{background:var(--red);color:#fff}
+.btn.red:hover{background:#ef4141}
+.btn.ghost{box-shadow:inset 0 0 0 1px var(--line)}
+.btn.ghost:hover{box-shadow:inset 0 0 0 1px rgba(243,239,232,.5)}
+.btn.sm{height:38px;padding:0 17px;font-size:14px}
+.btn svg{width:.8em;height:.8em;fill:currentColor}
+.menu{display:none;width:40px;height:40px;border:0;border-radius:50%;background:rgba(243,239,232,.08);cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.menu i{display:block;width:16px;height:1.5px;background:var(--paper)}
+
+/* hero: copy on the left, the panel lands in the slot on the right */
+.hero{position:absolute;z-index:4;left:var(--gut);right:var(--gut);top:var(--navh);bottom:var(--gut);display:grid;grid-template-columns:minmax(0,4.2fr) minmax(0,5.8fr);column-gap:var(--colgap);pointer-events:none}
+.slot{border-radius:clamp(16px,1.6vw,24px)}
+.intro{display:flex;flex-direction:column;min-height:0;padding-top:clamp(6px,1.6vh,18px)}
+#stage:not(.ui) .intro,#stage:not(.ui) .links,#stage:not(.ui) .navcta{visibility:hidden}
+.intro>*{pointer-events:auto}
+.eyebrow{margin:0 0 clamp(14px,2.4vh,26px);display:flex;align-items:center;gap:10px;font:500 11.5px/1 'DM Mono',ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);opacity:var(--ui)}
+.eyebrow img{width:14px;height:14px}
+.lede{margin:auto 0}
+.head{margin:0;font-weight:800;font-size:var(--hs);line-height:.92;letter-spacing:-.048em}
+.head .w{display:inline-block;overflow:hidden;vertical-align:top;padding:0 .02em .1em 0;margin-bottom:-.1em}
+.head .w>span{display:inline-block;will-change:transform}
+.head em{font-style:normal;color:var(--red)}
+.sub{margin:clamp(16px,2.6vh,28px) 0 0;max-width:30em;font-size:clamp(15px,1.2vw,18px);line-height:1.45;color:var(--mute);opacity:var(--ui2);transform:translateY(calc((1 - var(--ui2)) * 14px))}
+.ctas{margin-top:clamp(18px,3.2vh,34px);display:flex;flex-wrap:wrap;gap:10px;opacity:var(--ui2);transform:translateY(calc((1 - var(--ui2)) * 14px))}
+.who{display:flex;align-items:center;gap:14px;padding-top:18px;opacity:var(--ui3);transform:translateY(calc((1 - var(--ui3)) * 10px))}
+.ava{flex:none;width:46px;height:46px;border-radius:50%;background:#ecebe8 url(../../assets/img/avatar.jpg) 52% 20%/192% auto no-repeat;box-shadow:0 0 0 1px var(--line)}
+.who p{margin:0;display:flex;flex-direction:column;gap:4px;font-size:13.5px;line-height:1.3}
+.who b{font-weight:600}
+.who span{color:var(--mute)}
+
+/* loading counter */
+.counter{position:absolute;z-index:5;right:var(--gut);display:flex;flex-direction:column;align-items:flex-end;gap:10px;font-weight:800;line-height:1;letter-spacing:-.04em;opacity:var(--fade);transform:translateY(calc((1 - var(--fade)) * -14px));pointer-events:none}
+.c1 .counter{top:var(--gut);font-size:clamp(44px,6vw,96px)}
+.c2 .counter{top:auto;right:auto;left:var(--gut);bottom:var(--gut);align-items:flex-start;font-size:clamp(60px,9.5vw,160px);flex-direction:column-reverse;transform:translateY(calc((1 - var(--fade)) * 14px))}
+.num{display:flex;align-items:flex-start}
+.odo{display:inline-flex;font-variant-numeric:tabular-nums}
+.col{display:inline-block;height:1em;overflow:hidden}
+.strip{display:block;will-change:transform}
+.strip span{display:block;height:1em}
+.num sup{font-size:.3em;margin-left:.08em;margin-top:.1em;color:var(--red);letter-spacing:0}
+.cap{font:500 11px/1 'DM Mono',ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+
+/* the loader switch: a quiet chip in the corner */
+.switch{position:absolute;z-index:10;right:calc(100vw - var(--gut) - (100vw - 2 * var(--gut) - var(--colgap)) * .42);bottom:calc(var(--gut) + 8px);display:flex;gap:1px;padding:3px;border-radius:999px;background:rgba(13,12,11,.62);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(243,239,232,.1);opacity:.72;transition:opacity .2s}
+.switch:hover,.switch:focus-within{opacity:1}
+.switch button{border:0;background:transparent;color:rgba(243,239,232,.7);font:500 10.5px/1 'DM Mono',ui-monospace,monospace;letter-spacing:.04em;padding:7px 10px;border-radius:999px;cursor:pointer}
+.switch button:hover{color:#fff}
+.switch button[aria-pressed="true"]{background:var(--paper);color:var(--ink)}
+
+/* stacked: phones and tall screens */
+@media (max-width:720px),(max-aspect-ratio:4/5){
+  :root{--navh:60px;--gut:14px;--big:2.3;--hs:clamp(34px,10.2vw,58px)}
+  .hero{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);row-gap:16px}
+  .intro{padding-top:4px}
+  .eyebrow{margin-bottom:12px}
+  .sub{margin-top:12px;font-size:15px;line-height:1.4}
+  .ctas{margin-top:16px}
+  .ctas .btn{height:44px;padding:0 18px;font-size:14.5px}
+  .who{margin-top:14px;padding-top:0;gap:10px}
+  .ava{width:34px;height:34px}
+  .who p{gap:2px;font-size:12px}
+  .switch{right:calc(var(--gut) + 10px);bottom:calc(var(--gut) + 10px)}
+  .br{display:none}
+  .wcap{left:10px;top:10px}
+}
+@media (max-width:720px){
+  .links{display:none;position:absolute;right:var(--gut);top:calc(var(--navh) - 4px);flex-direction:column;gap:2px;padding:6px;border-radius:16px;background:rgba(23,20,18,.96);box-shadow:0 18px 40px rgba(0,0,0,.5),inset 0 0 0 1px var(--line);font-size:16px}
+  .links a{opacity:1;padding:12px 18px;border-radius:10px}
+  .nav.open .links{display:flex}
+  .menu{display:flex}
+  .navcta{display:none}
+  .c1 .counter{font-size:44px}
+}
+@media (prefers-reduced-motion:reduce){.face video,.btn,.pl{transition:none}}
+</style>
+</head>
+<body>
+<div id="stage" class="c1">
+  <header class="nav" id="nav">
+    <a class="logo" href="#top" aria-label="nomada toast, home"><img src="../../assets/img/loader-splash-wordmark-white.png" alt=""></a>
+    <nav class="links" aria-label="Main"><a href="#reels">Reels</a><a href="#about">About</a><a href="#contact">Contact</a></nav>
+    <a class="btn ghost sm navcta" href="#contact">Work with me</a>
+    <button class="menu" type="button" aria-label="Menu" aria-expanded="false"><i></i><i></i></button>
+  </header>
+
+  <main class="hero" id="top">
+    <section class="intro" aria-labelledby="head">
+      <p class="eyebrow"><img src="../../assets/img/nav-mark.png" alt="">Creator · AI &amp; creative tools</p>
+      <div class="lede">
+      <h1 class="head" id="head"><span class="w"><span>Reels</span></span> <span class="w"><span>that</span></span><br class="br"> <span class="w"><span>make</span></span> <span class="w"><span>AI</span></span><br class="br"> <span class="w"><span>make</span></span> <span class="w"><span>sense<em>.</em></span></span></h1>
+      <p class="sub">Short vertical reels for AI and creative tools, built to stop the scroll and show what the product actually does.</p>
+      <div class="ctas">
+        <a class="btn red" href="#contact">Work with me <span aria-hidden="true">→</span></a>
+        <a class="btn ghost" href="#reels" id="watch"><svg viewBox="0 0 10 12" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg>Watch reels</a>
+      </div>
+      </div>
+      <div class="who" id="about"><span class="ava" aria-hidden="true"></span><p><b>Tino Mendes</b><span>Reels for Gamma, Artlist, Kittl, Meshy &amp; more</span></p></div>
+    </section>
+    <div class="slot" id="slot"></div>
+  </main>
+
+  <div id="panel" role="region" aria-label="Reels" inert>
+    <video id="sky" muted loop playsinline preload="auto" poster="../../assets/backdrop/backdrop.jpg" src="../../assets/backdrop/backdrop.mp4" aria-hidden="true"></video>
+    <div class="shade"></div>
+    <div id="deal"></div>
+    <div id="scene"><div id="ring"></div></div>
+    <p class="wcap"><img src="../../assets/img/nav-mark.png" alt=""><b>Selected reels</b><span id="hint">Hover to play · drag to spin</span></p>
+  </div>
+
+  <div class="counter" aria-hidden="true">
+    <div class="num"><span class="odo" id="odo"></span><sup>%</sup></div>
+    <div class="cap">Loading reels</div>
+  </div>
+
+  <div class="switch" role="group" aria-label="Intro loader">
+    <button type="button" data-c="1" aria-pressed="true">01 Deal</button>
+    <button type="button" data-c="2" aria-pressed="false">02 Ring</button>
+    <button type="button" id="replay" aria-label="Replay intro">↻</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------- small helpers ----------
+const $ = s => document.querySelector(s);
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const rad = d => d * Math.PI / 180;
+const eo3 = t => 1 - Math.pow(1 - clamp01(t), 3);
+const wrap = a => ((a + 180) % 360 + 360) % 360 - 180;
+// set a style or custom property only when its value changes
+const put = (el, k, v) => { const m = el._put || (el._put = {}); if (m[k] !== v) { m[k] = v; k[0] === '-' ? el.style.setProperty(k, v) : (el.style[k] = v); } };
+// a damped spring from 0 to 1, ms after it starts: w is how quick, z how much it bounces (lower = more)
+const spr = (ms, w = 12, z = 0.6) => {
+  const t = ms / 1000; if (t <= 0) return 0;
+  const wd = w * Math.sqrt(1 - z * z);
+  return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
+};
+// a kick that pushes out, recoils and settles
+const recoil = (ms, amp, w = 11, decay = 4.2) => { const t = ms / 1000; return t <= 0 ? 0 : amp * Math.exp(-decay * t) * Math.sin(w * t); };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TOUCH = matchMedia('(hover: none)').matches;
+
+// ---------- the reels, in rank order; s = Tino in the studio, c = colour ----------
+const REELS = [
+  { s: 'gamma', b: 'Gamma', t: 'AI presentations', k: 's' },
+  { s: 'artlist', b: 'Artlist', t: 'AI film', k: 'c' },
+  { s: 'amp', b: 'Amp', t: 'AI strength coach', k: 's' },
+  { s: 'kapkap', b: 'KapKap', t: 'AI captions', k: 'c' },
+  { s: 'kittl-logos', b: 'Kittl', t: 'AI logos', k: 'c' },
+  { s: 'meshy', b: 'Meshy', t: 'AI 3D', k: 'c' },
+  { s: 'rabbit-r1', b: 'Rabbit r1', t: 'AI gadget', k: 's' },
+  { s: 'printify', b: 'Printify', t: 'Print on demand', k: 's' },
+  { s: 'kittl-merch', b: 'Kittl', t: 'Art to merch', k: 'c' },
+  { s: 'plaud', b: 'Plaud', t: 'AI note taker', k: 's' },
+  { s: 'productscope', b: 'ProductScope', t: 'AI product photos', k: 'c' },
+  { s: 'vozo', b: 'Vozo', t: 'AI video rewrite', k: 's' },
+  { s: 'invideo', b: 'invideo AI', t: 'Text to video', k: 's' }
+];
+
+// ---------- the drum: 26 slots, slot o at o × 360/26; even slots on the top row, odd below, like brickwork ----------
+const M = 26, STEP = 360 / M, SLOTS = {};
+(() => {
+  const pick = { s: REELS.filter(r => r.k === 's'), c: REELS.filter(r => r.k === 'c') }, n = { s: 0, c: 0 };
+  // the 13 front slots hold every reel once, studio and colour alternating along each row, the top ranks nearest the front
+  const front = []; for (let o = -6; o <= 6; o++) front.push(o);
+  front.sort((a, b) => Math.abs(a) - Math.abs(b) || b - a);
+  for (const o of front) { const k = (o + 6) % 4 < 2 ? 's' : 'c'; SLOTS[o] = { r: REELS.indexOf(pick[k][n[k]++]), main: true }; }
+  for (let o = -13; o <= 12; o++) { // the back half repeats the front, half a turn round
+    if (!SLOTS[o]) SLOTS[o] = { r: SLOTS[o > 0 ? o - 13 : o + 13].r, main: false };
+    SLOTS[o].top = (o & 1) === 0;
+  }
+})();
+
+// ---------- page ----------
+const stage = $('#stage'), panel = $('#panel'), sky = $('#sky'), dealBox = $('#deal'), scene = $('#scene'), ringBox = $('#ring'), slotEl = $('#slot');
+const words = [...document.querySelectorAll('.head .w > span')];
+const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+let concept = 1, t0 = 0, last = 0, spin2 = 0, started = false, skyOn = false;
+// the person's hand on the drum: an offset in degrees, a glide velocity, the drag in progress, a card being spun to the front
+const U = { off: 0, vel: 0, drag: null, press: null, goal: null, live: false, rm: 400, hover: false, focus: false, moved: 0, downT: -1e4 };
+
+// layout: the slot is where the panel lands; the drum is sized to fill it
+const L = { win: { l: 0, t: 0, w: 1, h: 1 }, rad: 22, Q: null };
+function drum(W) {
+  const rows = W.w >= 560 && W.h >= 520 ? 2 : 1, top = 46, bot = rows === 2 ? 18 : 46, g = Math.max(8, W.h * 0.016); // the top strip is the caption's
+  let h = (W.h - top - bot - g * (rows - 1)) / rows, w = Math.min(h * 9 / 16, W.w * (rows === 2 ? 0.3 : 0.62));
+  h = w * 16 / 9;
+  const R = (w + g) / (2 * Math.sin(rad(STEP * rows / 2))); // neighbours on a row sit a card and a gap apart
+  return { rows, w, h, g, R, P: Math.max(1100, R * 3.3), cx: W.l + W.w / 2, cy: W.t + top + (W.h - top - bot) / 2 };
+}
+function measure() {
+  const r = slotEl.getBoundingClientRect();
+  L.win = { l: r.left, t: r.top, w: r.width, h: r.height };
+  L.rad = parseFloat(getComputedStyle(slotEl).borderTopLeftRadius) || 22;
+  L.Q = drum(L.win); U.rm = L.Q.R;
+}
+function setPanel(p) { // 0 = full bleed, 1 = the slot (springs may overshoot a touch)
+  const k = Math.max(0, p), W = L.win, l = W.l * k, t = W.t * k;
+  put(panel, 'left', l.toFixed(1) + 'px'); put(panel, 'top', t.toFixed(1) + 'px');
+  put(panel, 'width', lerp(innerWidth, W.w, k).toFixed(1) + 'px'); put(panel, 'height', lerp(innerHeight, W.h, k).toFixed(1) + 'px');
+  put(panel, 'borderRadius', (L.rad * Math.min(1, k)).toFixed(1) + 'px');
+  put(stage, '--win', clamp01(k).toFixed(3));
+  return { l, t };
+}
+// the slow turn once landed, paused under the hand, over the drum or on a focused card; a one-row drum (phones) holds still
+const drift = ms => REDUCED || U.hover || U.focus || U.drag || U.goal != null || L.Q.rows === 1 ? 0 : 2.4 * clamp01(ms / 900);
+
+// odometer: each column springs to its target, so the digits roll past and settle
+const odo = $('#odo');
+odo.innerHTML = [0, 1, 2].map(() => `<span class="col"><span class="strip">${'01234567890'.split('').map(d => `<span>${d}</span>`).join('')}</span></span>`).join('');
+const strips = [...odo.querySelectorAll('.strip')];
+const cols = [{ p: 0, v: 0, w: 15 }, { p: 0, v: 0, w: 12 }, { p: 0, v: 0, w: 10 }]; // ones, tens, hundreds
+let target = 0;
+function stepOdo(dt, snap) {
+  const s = Math.min(dt, 40) / 1000;
+  cols.forEach((c, i) => {
+    const goal = Math.floor(target / Math.pow(10, i));
+    if (snap) { c.p = goal; c.v = 0; }
+    else { c.v += (c.w * c.w * (goal - c.p) - 2 * 0.55 * c.w * c.v) * s; c.p += c.v * s; }
+    const d = ((c.p % 10) + 10) % 10;
+    put(strips[2 - i], 'transform', `translateY(${-d.toFixed(3)}em)`);
+  });
+}
+
+// the shared chrome: counter out, the wordmark shrinks into the nav, the copy rises in word by word
+function chrome(tFade, tUi) {
+  const k = d => eo3((tUi - d) / 700).toFixed(3);
+  put(stage, '--fade', (1 - eo3(tFade / 380)).toFixed(3));
+  put(stage, '--ui', k(0)); put(stage, '--ui2', k(380)); put(stage, '--ui3', k(560));
+  put(stage, '--tags', eo3((tUi - 200) / 600).toFixed(3));
+  words.forEach((w, i) => { const s = spr(tUi - 60 - i * 55, 10, 0.8); put(w, 'transform', `translateY(${((1 - s) * 105).toFixed(1)}%)`); });
+  stage.classList.toggle('ui', tUi > 0);
+  if (tFade > 0 && !skyOn) { skyOn = true; if (!REDUCED) { const p = sky.play(); if (p) p.catch(() => {}); } }
+}
+function faceAlpha(c, a) {
+  const v = a < 0.01 ? '0' : a.toFixed(3);
+  put(c.faces[0], 'opacity', v); put(c.faces[1], 'opacity', v); put(c.el, 'pointerEvents', a < 0.01 ? 'none' : '');
+}
+
+// ---------- 01 deal ----------
+// 19 cards are dealt into the top half of a wheel; 7 more wait below the horizon for the back of the drum
+const D = { N: 19, GAP: 74, T0: 180, cards: [], auto: 0 };
+D.order = [0]; for (let k = 1; k <= 9; k++) D.order.push(k, -k); // offsets from the top: centre first, then right, left, right…
+D.idx = {}; D.order.forEach((o, k) => { D.idx[o] = k; });
+D.Tland = D.T0 + (D.N - 1) * D.GAP + 420; // the last card is down
+D.Tbreath = D.Tland - 60; D.Trev = D.Tland + 420; D.Tzoom = D.Trev + 240;
+
+function dealFrame(t, dt) {
+  const vw = innerWidth, vh = innerHeight, Q = L.Q;
+  const pr = setPanel(spr(t - D.Tzoom - 120, 4.6, 0.86));
+  const R0 = Math.min(vw * (vw < 720 ? 0.38 : 0.22), vh * 0.34), h0 = R0 * 0.5, w0 = h0 * 9 / 16, P0x = vw / 2, P0y = vh / 2 + R0 * 0.42;
+  const breath = 1 + recoil(t - D.Tbreath, 0.075);
+  D.auto += drift(t - D.Tzoom - 1400) * dt / 1000;
+  const spin = D.auto + U.off + mouse.x * 4, tilt = -0.5 - mouse.y * 2, cA = Math.cos(rad(tilt)), sA = Math.sin(rad(tilt));
+  const lean = Math.max(-10, Math.min(10, U.vel * 0.04)), half = (Q.h + Q.g) / 2;
+  U.live = t > D.Tzoom + 700;
+  let landed = 0;
+  for (const c of D.cards) {
+    const o = c.o, k = D.idx[o];
+    const zc = spr(t - D.Tzoom - Math.abs(o) * 26, 5.4, 0.74);                          // folds into the drum from the centre out
+    const R = R0 * breath, a = o * 10, phi = rad(90 - a), rm = R - h0 / 2;
+    const sx = P0x + rm * Math.cos(phi), sy = P0y - rm * Math.sin(phi);
+    let x = sx, y = sy, rot = a, flip = 0, tip = 0, sc = 1, lift = 0, z = 100, alpha = 1;
+    if (k == null) { alpha = clamp01((t - D.Tzoom - 600) / 400); z = 50; }                 // drum-only cards, below the horizon
+    else {
+      const e = t - (D.T0 + k * D.GAP);
+      if (e <= 0) { // face down on the deck
+        x = P0x; y = P0y - (D.N - k) * 0.8; rot = 0; flip = 180; tip = 58; sc = 0.52; z = 1 + D.N - k;
+      } else {
+        // tossed toward you, flipped face up, overshooting the slot and recoiling back into it
+        const sp = spr(e, 13, 0.56), sr = spr(e - 30, 10, 0.5), sf = spr(e, 14, 0.8), ss = spr(e, 13, 0.48), air = Math.sin(Math.PI * clamp01(e / 430));
+        x = lerp(P0x, sx, sp); y = lerp(P0y, sy, sp);
+        rot = a * sr; flip = 180 * (1 - sf); tip = 58 * (1 - sf) - 16 * air; sc = lerp(0.52, 1, ss); lift = 180 * air;
+        z = e < 460 ? 500 + k : 100 + k;
+        if (e > 280) landed++;
+      }
+    }
+    // its place on the drum, tilted a touch so the rows curve
+    const th = o * STEP + spin, q = rad(th), Y = Q.rows === 2 ? (c.top ? -half : half) : 0, Zr = Q.R * Math.cos(q);
+    const X = Q.R * Math.sin(q), Y1 = Y * cA - (Zr - Q.R) * sA, Z1 = Y * sA + (Zr - Q.R) * cA, face = Math.cos(q);
+    alpha *= lerp(1, clamp01((face - 0.12) / 0.25), zc);                                  // the sides fade before their backs turn to you
+    if (zc > 0.5) z = Math.round(300 + face * 100);
+    const w = lerp(w0, Q.w, zc), h = lerp(h0, Q.h, zc), bx = lerp(x, Q.cx, zc), by = lerp(y, Q.cy, zc);
+    const el = c.el, f = v => v.toFixed(2);
+    put(el, 'width', f(w) + 'px'); put(el, 'height', f(h) + 'px'); put(el, 'zIndex', String(z));
+    put(el, '--r', Math.max(5, w * 0.065).toFixed(1) + 'px');
+    put(el, 'transform', `translate(${f(bx - w / 2 - pr.l)}px,${f(by - h / 2 - pr.t)}px) rotate(${f(rot * (1 - zc))}deg) perspective(${f(lerp(900, Q.P, zc))}px) translate3d(${f(X * zc)}px,${f(Y1 * zc)}px,${f(Z1 * zc + lift)}px) rotateX(${f(tip + tilt * zc)}deg) rotateY(${f(flip + (th + lean) * zc)}deg) scale(${sc.toFixed(4)})`);
+    faceAlpha(c, alpha);
+  }
+  target = landed >= D.N ? 100 : Math.round(Math.floor(landed / 3) * 3 / D.N * 100); // the counter moves in chunks
+  const ts = t - D.Trev;
+  put(sky, 'opacity', eo3(ts / 480).toFixed(3)); put(sky, 'transform', `scale(${(1.1 - 0.1 * spr(ts, 3.6, 0.9)).toFixed(4)})`);
+  chrome(ts, t - D.Tzoom - 420);
+}
+
+// ---------- 02 ring ----------
+const G = { GAP: 64, T0: 220, cards: [] };
+G.Tland = G.T0 + (M - 1) * G.GAP + 460; G.Tbreath = G.Tland - 40; G.Trev = G.Tland + 380; G.Tdive = G.Trev + 220;
+
+function ringFrame(t, dt) {
+  const vw = innerWidth, vh = innerHeight, vmin = Math.min(vw, vh), Q = L.Q;
+  const dg = spr(t - G.Tdive, 4.2, 0.86);
+  setPanel(spr(t - G.Tdive - 200, 4.4, 0.86));
+  const P = lerp(Math.max(380, Math.min(820, vw * 0.45)), Q.P, dg); // a wide lens while it tumbles, a long one in the hero
+  scene.style.perspective = P + 'px'; scene.style.perspectiveOrigin = `50% calc(50% + ${((Q.cy - L.win.t - L.win.h / 2) * dg).toFixed(1)}px)`;
+  const cw0 = vmin * (vw < 720 ? 0.095 : 0.07), ch0 = cw0 * 16 / 9, R0 = M * cw0 * 1.16 / (2 * Math.PI);
+  const breath = 1 + recoil(t - G.Tbreath, 0.07, 10, 4);
+  const zC = lerp(-150, -Q.R, dg);                                       // the front of the drum ends at the screen
+  const ax = lerp(-24 + 3 * Math.sin(t / 1300), -0.5 - mouse.y * 2, dg), az = lerp(-15 + 2 * Math.cos(t / 1700), 0, dg) + Math.max(-4, Math.min(4, U.vel * -0.01)) * dg;
+  spin2 += lerp(-40, drift(t - G.Tdive - 1400), dg) * Math.min(dt, 64) / 1000; // tumbling while it builds, a slow drift after
+  const sp = spin2 + U.off + mouse.x * 4 * dg, half = (Q.h + Q.g) / 2, lean = Math.max(-10, Math.min(10, U.vel * 0.04)), pv = Q.R * dg; // in the hero it tilts about its front
+  U.live = t > G.Tdive + 900;
+  ringBox.style.transform = `translate3d(0,${(Q.cy - L.win.t - L.win.h / 2) * dg}px,${zC + pv}px) rotateX(${ax}deg) rotateZ(${az}deg) translate3d(0,0,${-pv}px) rotateY(${sp}deg)`;
+  const cX = Math.cos(rad(ax)), sX = Math.sin(rad(ax)), cZ = Math.cos(rad(az)), sZ = Math.sin(rad(az));
+  let landed = 0;
+  for (const c of G.cards) {
+    const { el, k, o } = c, e = t - (G.T0 + k * G.GAP);
+    if (e <= 0) { faceAlpha(c, 0); continue; }
+    if (e > 300) landed++;
+    const lay = spr(e, 12.5, 0.55), f = spr(e, 11, 0.68);                 // comes in from outside, turned, and springs into its slot
+    const dk = spr(t - G.Tdive - k * 12, 4.4, 0.8);                      // the push-in ripples around the ring
+    const R = lerp(R0 * breath, Q.R, dk), cw = lerp(cw0, Q.w, dk), ch = lerp(ch0, Q.h, dk), r = R + (1 - lay) * 120, th = o * STEP;
+    const y0 = Q.rows === 2 ? (c.top ? -half : half) * dk : 0;
+    const qa = rad(th + sp); let x = r * Math.sin(qa), y = y0, z = r * Math.cos(qa) - pv;
+    [x, y] = [x * cZ - y * sZ, x * sZ + y * cZ]; [y, z] = [y * cX - z * sX, y * sX + z * cX]; z += pv + zC;
+    const alpha = Math.min(clamp01(e / 140), clamp01((P - 60 - z) / 240), lerp(1, clamp01((Math.cos(qa) - 0.12) / 0.25), dg)); // fade cards that pass the camera, then the back of the drum
+    faceAlpha(c, alpha);
+    if (alpha < 0.01) continue;
+    const n = v => v.toFixed(2);
+    put(el, 'width', n(cw) + 'px'); put(el, 'height', n(ch) + 'px'); put(el, 'left', n(-cw / 2) + 'px'); put(el, 'top', n(-ch / 2) + 'px');
+    put(el, '--r', Math.max(5, cw * 0.065).toFixed(1) + 'px');
+    put(el, 'transform', `translateY(${n(y0)}px) rotateY(${n(th)}deg) translateZ(${n(r)}px) rotateY(${n(-70 * (1 - f) + lean * dg)}deg) rotateX(${n(40 * (1 - f))}deg) scale(${(0.55 + 0.45 * lay).toFixed(4)})`);
+  }
+  target = landed >= M ? 100 : Math.round(Math.floor(landed / 3) * 3 / M * 100);
+  const ts = t - G.Trev;
+  put(sky, 'opacity', eo3(ts / 520).toFixed(3)); put(sky, 'transform', `scale(${(1.1 - 0.1 * spr(ts, 3.4, 0.9)).toFixed(4)})`);
+  chrome(ts, t - G.Tdive - 520);
+}
+
+// ---------- build, loop, controls ----------
+function makeCard(o) {
+  const S = SLOTS[o], r = REELS[S.r], el = document.createElement('button');
+  el.type = 'button'; el.className = 'card';
+  el.innerHTML = `<div class="face"><img alt="" draggable="false" src="../../assets/reels/${r.s}.jpg"><video muted loop playsinline preload="none" data-src="../../assets/reels/${r.s}.mp4"></video><span class="tag"><span><b>${r.b}</b><i>${r.t}</i></span><span class="pl"></span></span></div><div class="face back"></div>`;
+  if (S.main) { el.setAttribute('aria-label', `${r.b} reel: ${r.t}. Play preview`); el.setAttribute('aria-pressed', 'false'); }
+  else { el.tabIndex = -1; el.setAttribute('aria-hidden', 'true'); el.addEventListener('mousedown', e => e.preventDefault()); } // the back half repeats the front, so only one of each is announced
+  const c = { el, o, top: S.top, main: S.main, faces: [...el.children] };
+  el._c = c;
+  return c;
+}
+function build() {
+  for (let o = -13; o <= 12; o++) { // dom order runs left to right round the front, so Tab walks the drum
+    const d = makeCard(o); dealBox.appendChild(d.el); D.cards.push(d);
+    const g = makeCard(o); g.k = (o + M) % M; ringBox.appendChild(g.el); G.cards.push(g);
+  }
+}
+const cards = () => concept === 1 ? D.cards : G.cards;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!started) return;
+  const dt = Math.min(64, now - last); last = now;
+  mouse.x += (mouse.tx - mouse.x) * 0.06; mouse.y += (mouse.ty - mouse.y) * 0.06;
+  const t = now - t0;
+  stepUser(dt);
+  if (concept === 1) dealFrame(t, dt); else ringFrame(t, dt);
+  stage.classList.toggle('live', U.live);
+  if (panel.inert === U.live) panel.inert = !U.live;
+  stepOdo(dt, false);
+}
+function start(c) {
+  stop(true);
+  concept = c; spin2 = 0; target = 0; last = performance.now(); skyOn = false;
+  Object.assign(U, { off: 0, vel: 0, drag: null, press: null, goal: null, live: false }); D.auto = 0; stage.classList.remove('dragging');
+  t0 = REDUCED ? last - 20000 : last; // reduced motion: straight to the hero
+  if (!REDUCED) { sky.pause(); sky.currentTime = 0; }
+  measure(); stepOdo(0, true);
+  stage.className = 'c' + c;
+  dealBox.style.display = c === 1 ? '' : 'none'; scene.style.display = c === 2 ? '' : 'none';
+  [...D.cards, ...G.cards].forEach(d => faceAlpha(d, 0));
+  document.querySelectorAll('.switch [data-c]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.c === c)));
+  try { history.replaceState(null, '', '#' + c); } catch (e) {}
+}
+document.querySelectorAll('.switch [data-c]').forEach(b => b.addEventListener('click', () => start(+b.dataset.c)));
+$('#replay').addEventListener('click', () => start(concept));
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === '1' || e.key === '2') start(+e.key); else if (e.key.toLowerCase() === 'r') start(concept);
+});
+addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; mouse.tx = e.clientX / innerWidth * 2 - 1; mouse.ty = e.clientY / innerHeight * 2 - 1; });
+addEventListener('resize', measure);
+if (TOUCH) $('#hint').textContent = 'Tap to play · swipe to spin';
+
+// mobile menu
+const nav = $('#nav'), menu = $('.menu');
+menu.addEventListener('click', () => { const open = !nav.classList.contains('open'); nav.classList.toggle('open', open); menu.setAttribute('aria-expanded', String(open)); });
+nav.addEventListener('click', e => { if (e.target.closest('.links a')) { nav.classList.remove('open'); menu.setAttribute('aria-expanded', 'false'); } });
+
+// ---------- reels: the poster crossfades into the muted clip on hover, keyboard focus or tap ----------
+let playing = null;
+function play(card) {
+  if (playing === card) return;
+  stop(); playing = card;
+  const v = card.querySelector('video');
+  if (!v.getAttribute('src')) v.src = v.dataset.src; // nothing loads until a card is asked to play
+  v.muted = true;
+  const on = () => { if (playing === card) card.classList.add('on'); };
+  v.addEventListener('playing', on, { once: true });
+  const p = v.play(); if (p) p.catch(() => {});
+  if (!v.paused && v.readyState > 2) on();
+  if (card.hasAttribute('aria-pressed')) card.setAttribute('aria-pressed', 'true');
+}
+function stop(now) {
+  const c = playing; if (!c) return; playing = null;
+  c.classList.remove('on');
+  if (c.hasAttribute('aria-pressed')) c.setAttribute('aria-pressed', 'false');
+  const v = c.querySelector('video');
+  if (now) v.pause(); else setTimeout(() => { if (playing !== c) v.pause(); }, 520); // after the fade back to the poster
+}
+// spin a card round to the front
+const angle0 = () => (concept === 1 ? D.auto : spin2) + mouse.x * 4;
+function spinTo(c) {
+  const a = wrap(c.o * STEP + angle0() + U.off);
+  if (REDUCED) { U.off -= a; U.vel = 0; } else U.goal = U.off - a;
+}
+const frontCard = () => cards().filter(c => c.main).reduce((b, c) => {
+  const a = Math.abs(wrap(c.o * STEP + angle0() + U.off));
+  return a < b.a ? { a, c } : b;
+}, { a: 999, c: null }).c;
+const cardOf = e => e.target.closest ? e.target.closest('.card') : null;
+
+panel.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; U.hover = true; const c = cardOf(e); if (c && !U.drag) play(c); });
+panel.addEventListener('pointerout', e => {
+  if (e.pointerType !== 'mouse') return;
+  const c = cardOf(e); if (c && c === playing && !c.contains(e.relatedTarget) && document.activeElement !== c) stop();
+  if (!panel.contains(e.relatedTarget)) U.hover = false;
+});
+panel.addEventListener('focusin', e => { const c = cardOf(e); if (!c) return; U.focus = true; if (performance.now() - U.downT > 900) { play(c); spinTo(c._c); } });
+panel.addEventListener('focusout', e => { const c = cardOf(e); if (!panel.contains(e.relatedTarget)) U.focus = false; if (c && c === playing && !panel.contains(e.relatedTarget) && !c.matches(':hover')) stop(); });
+panel.addEventListener('click', e => {
+  const c = cardOf(e); if (!c || performance.now() - U.moved < 120) return;
+  if (playing === c && (e.detail === 0 || U.ptype !== 'mouse')) stop(); // keys and taps toggle
+  else { play(c); spinTo(c._c); }
+});
+document.querySelectorAll('a[href="#reels"]').forEach(a => a.addEventListener('click', e => { // "Watch reels" brings the front reel to you and plays it
+  e.preventDefault(); const c = frontCard(); if (!c || !U.live) return;
+  c.el.focus({ preventScroll: true, focusVisible: true }); play(c.el); spinTo(c);
+}));
+
+// ---------- spinning the drum by hand ----------
+// glide after a flick or a scroll, easing back into the automatic drift; a card spun to the front is pulled there on a spring
+function stepUser(dt) {
+  const s = dt / 1000;
+  if (U.drag) { U.vel *= Math.exp(-dt / 140); return; }
+  if (U.goal != null) {
+    const w = 9; U.vel += (w * w * (U.goal - U.off) - 2 * 0.9 * w * U.vel) * s; U.off += U.vel * s;
+    if (Math.abs(U.goal - U.off) < 0.05 && Math.abs(U.vel) < 1) { U.off = U.goal; U.vel = 0; U.goal = null; }
+    return;
+  }
+  U.off += U.vel * s; U.vel *= Math.exp(-dt / 420);
+  if (Math.abs(U.vel) < 0.05) U.vel = 0;
+  if (U.live && L.Q.rows === 1 && Math.abs(U.vel) < 24) { // a one-row drum comes to rest on the card it is gliding toward
+    const ahead = U.vel * 0.42, a = (((angle0() + U.off + ahead) % STEP) + STEP * 1.5) % STEP - STEP / 2;
+    if (Math.abs(a) > 0.05) U.goal = U.off + ahead - a;
+  }
+}
+// degrees per pixel: the front card stays under the finger
+const degPerPx = () => 180 / (Math.PI * U.rm);
+// a scroll or key press: one wheel notch moves about one card
+const push = d => { U.goal = null; U.vel = Math.max(-540, Math.min(540, U.vel + d * -0.35)); };
+panel.addEventListener('pointerdown', e => {
+  U.ptype = e.pointerType; U.downT = performance.now();
+  if (!U.live || e.button !== 0) return;
+  U.press = { id: e.pointerId, x0: e.clientX, x: e.clientX, t: performance.now() }; U.vel = 0; U.goal = null;
+});
+panel.addEventListener('pointermove', e => {
+  const p = U.press; if (!p || e.pointerId !== p.id) return;
+  if (!U.drag) { // a drag only starts past a few pixels, so a tap still reaches the card
+    if (Math.abs(e.clientX - p.x0) < 6) return;
+    U.drag = p; stop();
+    try { panel.setPointerCapture(e.pointerId); } catch (err) {}
+    stage.classList.add('dragging');
+  }
+  const now = performance.now(), deg = (e.clientX - p.x) * degPerPx();
+  U.off += deg; U.vel = Math.max(-540, Math.min(540, U.vel * 0.6 + deg / Math.max(16, now - p.t) * 1000 * 0.4)); // a hard flick tops out at 1½ turns a second
+  p.x = e.clientX; p.t = now;
+});
+const endDrag = e => {
+  const p = U.press; if (!p || e.pointerId !== p.id) return;
+  if (U.drag) { if (performance.now() - p.t > 90) U.vel = 0; U.moved = performance.now(); } // held still before letting go: no flick
+  U.drag = null; U.press = null; stage.classList.remove('dragging');
+};
+panel.addEventListener('pointerup', endDrag); panel.addEventListener('pointercancel', endDrag);
+panel.addEventListener('wheel', e => {
+  if (!U.live) return;
+  e.preventDefault();
+  const d = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  push(d);
+}, { passive: false });
+addEventListener('keydown', e => {
+  if (!U.live || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+  e.preventDefault();
+  const dir = e.key === 'ArrowRight' ? 1 : -1, c = document.activeElement && document.activeElement._c;
+  if (c && c.main) { // on a card: step to its neighbour round the front
+    const n = cards().find(d => d.main && d.o === (c.o + dir + 19) % 13 - 6);
+    if (n) n.el.focus({ focusVisible: true });
+  } else push(dir * -110);
+});
+
+// fonts and posters first, then go
+const fonts = Promise.all([`800 40px 'Inter Tight'`, `600 20px 'Inter Tight'`, `500 20px 'Inter Tight'`, `400 20px 'Inter Tight'`, `500 20px 'DM Mono'`].map(f => document.fonts.load(f)));
+const posters = Promise.all(REELS.map(r => { const i = new Image(); i.src = `../../assets/reels/${r.s}.jpg`; return i.decode().catch(() => {}); }));
+Promise.race([Promise.all([fonts, posters]), new Promise(r => setTimeout(r, 3000))]).then(() => {
+  build();
+  started = true;
+  start(location.hash === '#2' ? 2 : 1);
+});
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
