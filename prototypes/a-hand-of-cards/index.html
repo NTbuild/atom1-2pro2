@@ -1,0 +1,542 @@
+<!doctype html>
+<!--
+  Loader study for nomada toast — two loading animations that land in the site's header.
+  01 Deal: red cards are dealt from a deck one by one; each is tossed, flips over to a reel and lands in an arc
+  with a recoil. The hand breathes, the studio light comes up, and the arc opens into the header's hand of reels.
+  02 Ring: the cards lay into a tumbling 3D ring one after another, then the ring tips up to face you and opens
+  into the same hand.
+  One file, plain HTML/CSS/JS, motion on damped springs. Posters, clips and marks live in assets/.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>nomada toast — Tino Mendes</title>
+<meta name="description" content="Tino Mendes makes vertical reels for AI and creative tools.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F4F1EC;--ink:#100E0D;--red:#E33131;--gut:clamp(16px,2.2vw,30px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);overflow:hidden;overscroll-behavior:none}
+body{font-family:'Inter Tight',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+
+#stage{position:fixed;inset:0;overflow:hidden;--fade:1;--ui:0;--ui2:0;--ui3:0;--mk:0;--shrink:.6;--nav:62px;--side:12px;--pad:clamp(22px,2.8vw,44px);--m0:28px}
+/* the panel is the loader's dark ground; in the hero it insets into the rounded window */
+#panel{position:absolute;inset:0;overflow:hidden;isolation:isolate;background:var(--ink);user-select:none;-webkit-user-select:none;will-change:left,top,right,bottom}
+#stage.live #panel{cursor:grab;touch-action:none}
+#stage.live.dragging #panel{cursor:grabbing}
+#sky{position:absolute;inset:-2%;opacity:0;background:#211b19;will-change:transform,opacity}
+#sky video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85}
+#sky::after{content:'';position:absolute;inset:0;background:radial-gradient(46% 56% at 50% 88%,rgba(227,49,49,.2),rgba(227,49,49,0)),linear-gradient(180deg,rgba(16,14,13,.86) 0%,rgba(16,14,13,.42) 46%,rgba(16,14,13,.66) 100%)}
+#deck{position:absolute;inset:0}
+
+/* a card: a 9:16 reel poster on the front, the red plus on the back */
+.card{position:absolute;left:0;top:0;margin:0;padding:0;border:0;background:none;-webkit-appearance:none;appearance:none;cursor:inherit;transform-style:preserve-3d;will-change:transform;outline:none;-webkit-tap-highlight-color:transparent}
+.card.off{pointer-events:none}
+.lift{position:absolute;inset:0;transform-style:preserve-3d}
+.face{position:absolute;inset:0;border-radius:7% / 3.94%;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 24px 46px -16px rgba(0,0,0,.8)}
+.front{background:var(--c,#2a2220);container-type:inline-size}
+.front img,.front video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}
+.front video{opacity:0;transition:opacity .5s ease}
+.card.on .front video{opacity:1}
+.front::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09)}
+.back{transform:rotateY(180deg);background:var(--red);display:grid;place-items:center}
+.back img{width:40%;height:auto;display:block}
+.back::after{content:'';position:absolute;inset:3.4% 6%;border:1px solid rgba(255,255,255,.42);border-radius:4.5% / 2.5%}
+.tag{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:1.4cqw;padding:30cqw 7.5cqw 8cqw;background:linear-gradient(to top,rgba(12,10,9,.82),rgba(12,10,9,0));color:#fff;text-align:left;line-height:1.1;opacity:var(--ui2)}
+.tag b{font-weight:600;font-size:7.4cqw;letter-spacing:-.01em}
+.tag i{font-style:normal;font-size:5.2cqw;opacity:.7}
+.play{position:absolute;right:6cqw;top:6cqw;width:12cqw;height:12cqw;border-radius:50%;background:rgba(12,10,9,.46);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);display:grid;place-items:center;opacity:var(--ui2);transition:background .3s}
+.play::before{content:'';width:0;height:0;margin-left:.8cqw;border-left:3.6cqw solid #fff;border-top:2.2cqw solid transparent;border-bottom:2.2cqw solid transparent}
+.card.on .play{background:var(--red);box-shadow:none}
+.card.on .play::before{margin:0;border:0;width:3.4cqw;height:3.4cqw;border-radius:50%;background:#fff}
+.bar{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--red);transform-origin:0 50%;transform:scaleX(0);opacity:0;transition:opacity .3s}
+.card.on .bar{opacity:1}
+.card:focus-visible .front{outline:2px solid #fff;outline-offset:3px}
+
+/* chrome: the brand mark, the nav, the hero copy */
+.mark{position:absolute;left:var(--gut);top:calc((var(--nav) - var(--m0)) / 2);z-index:6;display:flex;align-items:flex-start;gap:.1em;font-size:clamp(40px,5vw,76px);line-height:1;text-decoration:none;transform-origin:0 0;transform:scale(calc(1 - var(--ui) * var(--shrink)))}
+.mark .plus{width:.62em;height:auto;margin-top:-.1em;display:block}
+.mark .word{position:relative;display:block;width:2.714em;height:1em;overflow:hidden}
+.mark .word img{position:absolute;left:-.657em;top:-.229em;height:1.3em;width:auto;max-width:none;filter:brightness(calc(1 - var(--mk)))}
+.navr{position:absolute;right:var(--gut);top:0;height:var(--nav);z-index:6;display:flex;align-items:center;gap:clamp(16px,2.2vw,30px);opacity:var(--ui);transform:translateY(calc((1 - var(--ui)) * -8px))}
+.links{display:flex;gap:clamp(16px,2vw,28px);font-size:14px;font-weight:500}
+.links a{text-decoration:none;opacity:.66}
+.links a:hover{opacity:1}
+.menu{display:none;border:0;background:none;padding:8px 2px;font:500 14px/1 'Inter Tight',sans-serif;color:var(--ink);cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 20px;border-radius:999px;font-size:14px;font-weight:600;letter-spacing:-.005em;text-decoration:none;white-space:nowrap;transition:transform .2s,background .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-1px)}
+.btn.red{background:var(--red);color:#fff}
+.btn.red:hover{background:#ef3a3a}
+.btn.ink{background:var(--ink);color:var(--paper);height:38px;padding:0 17px}
+.btn.ghost{color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.34)}
+.btn.ghost:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.8)}
+.btn svg{width:12px;height:12px}
+#stage:not(.ui) .navr,#stage:not(.ui) .copy,#stage:not(.ui) .hint{visibility:hidden}
+
+.copy{position:absolute;z-index:5;left:calc(var(--side) + var(--pad));right:calc(var(--side) + var(--pad));top:calc(var(--nav) + var(--pad) * .8);display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px 48px;color:#fff;pointer-events:none}
+.copy a{pointer-events:auto}
+.lead{opacity:var(--ui2);transform:translateY(calc((1 - var(--ui2)) * 18px))}
+.side{max-width:360px;padding-bottom:.4em;opacity:var(--ui3);transform:translateY(calc((1 - var(--ui3)) * 18px))}
+.who{display:flex;align-items:center;gap:10px;margin:0 0 18px;font-size:13px;font-weight:500;letter-spacing:.01em;color:rgba(255,255,255,.8)}
+.who img{width:28px;height:28px;border-radius:50%;object-fit:cover;object-position:56% 18%;box-shadow:0 0 0 1.5px rgba(255,255,255,.9)}
+.who span{color:rgba(255,255,255,.5)}
+h1{margin:0;font-weight:600;font-size:clamp(38px,min(5.5vw,8.4vh),86px);line-height:.95;letter-spacing:-.045em;max-width:10.2em}
+.sub{margin:0 0 18px;font-size:15px;line-height:1.45;color:rgba(255,255,255,.7);text-wrap:pretty}
+.ctas{display:flex;gap:10px;flex-wrap:wrap}
+
+.counter{position:absolute;z-index:5;right:var(--gut);display:flex;flex-direction:column;align-items:flex-end;gap:10px;color:#fff;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;opacity:var(--fade);transform:translateY(calc((1 - var(--fade)) * -14px));pointer-events:none}
+.c1 .counter{top:calc(var(--nav) * .3);font-size:clamp(52px,7vw,112px)}
+.c2 .counter{top:auto;bottom:calc(var(--side) + 14px);font-size:clamp(64px,10vw,164px);flex-direction:column-reverse;transform:translateY(calc((1 - var(--fade)) * 14px))}
+.num{display:flex;align-items:flex-start;letter-spacing:-.04em}
+.odo{display:inline-flex}
+.col{display:inline-block;height:1em;overflow:hidden;margin-right:-.03em}
+.strip{display:block;will-change:transform}
+.strip span{display:block;height:1em}
+.num sup{font-size:.22em;margin-left:.16em;margin-top:.1em;color:var(--red)}
+.cap{font:400 11px/1 'DM Mono',ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+
+/* small glass pills on the window's lower corners: the loader switch and the how-to */
+.switch,.hint{position:fixed;z-index:10;bottom:calc(var(--side) + 12px);display:flex;align-items:center;gap:2px;padding:3px;border-radius:999px;background:rgba(16,14,13,.58);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);font:500 10px/1 'DM Mono',ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.switch{left:calc(var(--side) + 12px);padding-left:11px}
+.switch span{margin-right:5px}
+.switch button{border:0;background:transparent;color:rgba(255,255,255,.78);font:inherit;padding:7px 9px;border-radius:999px;cursor:pointer}
+.switch button:hover{color:#fff}
+.switch button[aria-pressed="true"]{background:#fff;color:var(--ink)}
+.hint{right:calc(var(--side) + 12px);padding:10px 12px;opacity:var(--ui3);pointer-events:none}
+
+@media (max-width:720px){
+  #stage{--pad:18px;--m0:22px}
+  .links{display:none;position:absolute;top:calc(100% - 6px);right:0;flex-direction:column;gap:0;padding:6px;min-width:150px;background:#fff;border-radius:14px;box-shadow:0 14px 34px rgba(16,14,13,.18)}
+  .links.open{display:flex}
+  .links a{padding:11px 14px;opacity:1;font-size:15px}
+  .menu{display:block}
+  .navr{gap:14px}
+  .btn.ink{height:34px;padding:0 14px;font-size:13px}
+  .copy{flex-direction:column;align-items:flex-start;gap:14px}
+  .who{margin-bottom:12px}
+  h1{font-size:clamp(32px,9.4vw,46px)}
+  .side{max-width:none;padding:0}
+  .sub{font-size:14px;margin-bottom:14px}
+  .btn{height:40px;padding:0 17px;font-size:13.5px}
+  .hint{display:none}
+  .br{display:none}
+  .c1 .counter{top:auto;bottom:calc(var(--side) + 14px);flex-direction:column-reverse;transform:translateY(calc((1 - var(--fade)) * 14px))}
+  .switch{left:auto;right:calc(var(--side) + 10px);bottom:auto;top:calc(var(--nav) + 14px);padding-left:3px}
+  .switch span{display:none}
+}
+@media (max-width:380px){ .navr .btn.ink{display:none} }
+</style>
+</head>
+<body>
+<div id="stage" class="c1">
+  <div id="panel">
+    <div id="sky"><video id="bd" muted loop playsinline preload="none" poster="../../assets/backdrop/backdrop.jpg" data-src="../../assets/backdrop/backdrop.mp4" aria-hidden="true"></video></div>
+    <div id="deck" role="group" aria-label="Reels. Drag, scroll or use the arrow keys to browse; hover, focus or tap a reel to play it." inert></div>
+  </div>
+
+  <a class="mark" id="mark" href="#top" aria-label="nomada toast, home"><img class="plus" src="../../assets/img/nav-mark.png" alt=""><span class="word"><img src="../../assets/img/loader-splash-wordmark-white.png" alt=""></span></a>
+  <nav class="navr" aria-label="Main">
+    <div class="links" id="links"><a href="#reels">Reels</a><a href="#brands">Brands</a><a href="#about">About</a></div>
+    <button class="menu" id="menu" aria-expanded="false" aria-controls="links">Menu</button>
+    <a class="btn ink" href="#contact">Work with me</a>
+  </nav>
+
+  <div class="counter" aria-hidden="true">
+    <div class="num"><span class="odo" id="odo"></span><sup>%</sup></div>
+    <div class="cap">Loading reels</div>
+  </div>
+
+  <header class="copy" id="copy">
+    <div class="lead">
+      <p class="who"><img src="../../assets/img/avatar.jpg" alt="">Tino Mendes <span>· creator</span></p>
+      <h1>Reels that make <br class="br">AI tools feel human.</h1>
+    </div>
+    <div class="side">
+      <p class="sub">I write, shoot and star in sponsored short-form videos for AI and creative tools.</p>
+      <div class="ctas">
+        <a class="btn red" href="#contact">Work with me</a>
+        <a class="btn ghost" href="#reels">Watch reels <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.6v8.8L10.4 6z" fill="currentColor"/></svg></a>
+      </div>
+    </div>
+  </header>
+  <div class="hint" id="hint" aria-hidden="true">Drag or scroll · hover to play</div>
+
+  <div class="switch" role="group" aria-label="Intro animation">
+    <span>Intro</span>
+    <button data-c="1" aria-pressed="true">01 Deal</button>
+    <button data-c="2" aria-pressed="false">02 Ring</button>
+    <button id="replay" aria-label="Replay intro">↻</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------- small helpers ----------
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const clamp01 = v => clamp(v, 0, 1);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rad = d => d * Math.PI / 180;
+const eo3 = t => 1 - Math.pow(1 - clamp01(t), 3);
+const wrap = (v, n) => ((v % n) + n) % n;           // 0 … n
+const wrapC = (v, n) => wrap(v + n / 2, n) - n / 2;  // -n/2 … n/2, the short way round
+// a damped spring from 0 to 1, ms after it starts: w is how quick, z how much it bounces (lower = more)
+const spr = (ms, w = 12, z = 0.6) => {
+  const t = ms / 1000; if (t <= 0) return 0;
+  const wd = w * Math.sqrt(1 - z * z);
+  return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
+};
+// how far behind its goal a spring has lagged, summed over time in seconds: the area under 1 - spr
+const sprLag = (ms, w = 12, z = 0.6) => {
+  const t = Math.max(0, ms) / 1000, a = z * w, b = w * Math.sqrt(1 - z * z);
+  return (2 * a + Math.exp(-a * t) * (-2 * a * Math.cos(b * t) + (b - a * a / b) * Math.sin(b * t))) / (w * w);
+};
+// a kick that pushes out, recoils and settles
+const recoil = (ms, amp, w = 11, decay = 4.2) => { const t = ms / 1000; return t <= 0 ? 0 : amp * Math.exp(-decay * t) * Math.sin(w * t); };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TOUCH = matchMedia('(hover: none)').matches;
+
+// ---------- the reels ----------
+// card k lands k places right of centre, so the list runs centre, right…, then wraps round to the left neighbours;
+// studio shots alternate with the colourful ones all the way round
+const REELS = [
+  ['gamma', 'Gamma', 'AI presentations', '#433535'], ['artlist', 'Artlist', 'AI film', '#2f3c4b'], ['amp', 'Amp', 'AI strength coach', '#3c211e'],
+  ['kittl-logos', 'Kittl', 'AI logos', '#6e5830'], ['printify', 'Printify', 'Print on demand', '#34231c'], ['productscope', 'ProductScope', 'AI product photos', '#6f6a67'],
+  ['vozo', 'Vozo', 'AI video rewrite', '#4e403d'], ['invideo', 'invideo AI', 'Text to video', '#3f2b24'], ['kittl-merch', 'Kittl', 'Art to merch', '#937e63'],
+  ['plaud', 'Plaud', 'AI note taker', '#412e2b'], ['kapkap', 'KapKap', 'AI captions', '#653d57'], ['rabbit-r1', 'Rabbit r1', 'AI gadget', '#4a3837'],
+  ['meshy', 'Meshy', 'AI 3D', '#706256']
+];
+const N = REELS.length;
+
+// ---------- page ----------
+const stage = $('#stage'), panel = $('#panel'), sky = $('#sky'), bd = $('#bd'), deck = $('#deck'), mark = $('#mark'), copy = $('#copy');
+const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+let concept = 1, t0 = 0, last = 0, started = false;
+// the hand: pos is which card sits in the centre (fractional while it moves), vel in cards a second, goal where it settles
+const U = { pos: 0, vel: 0, goal: 0, drag: null, press: null, live: false, idle: 0, wheel: 0 };
+const C = []; // the cards
+
+// hero layout: a nav strip on paper, then the rounded window holding the copy and the hand
+const HERO = { top: 62, side: 12, rad: 22 };
+const L = {}; // the hand, measured for this viewport
+function setPanel(p) { // 0 = full bleed, 1 = hero window (springs may overshoot a touch)
+  const k = Math.max(0, p);
+  panel.style.left = panel.style.right = panel.style.bottom = HERO.side * k + 'px';
+  panel.style.top = HERO.top * k + 'px';
+  panel.style.borderRadius = HERO.rad * Math.min(1, k) + 'px';
+  return { l: HERO.side * k, t: HERO.top * k };
+}
+// the hand: big 9:16 cards on a gentle curve whose feet sit low in the window, the outer ones running off its edges
+function layout() {
+  const vw = innerWidth, vh = innerHeight, small = vw <= 720;
+  HERO.top = small ? 56 : 62; HERO.side = small ? 8 : 12; HERO.rad = small ? 18 : 22;
+  stage.style.setProperty('--nav', HERO.top + 'px'); stage.style.setProperty('--side', HERO.side + 'px');
+  const bottom = vh - HERO.side, avail = bottom - (copy.offsetTop + copy.offsetHeight) - (small ? 20 : 30);
+  const H = clamp(avail, vh * (small ? 0.3 : 0.34), vh * (small ? 0.5 : 0.48));
+  L.H = H; L.W = H * 9 / 16; L.R = H * (small ? 2.7 : 3.4);
+  for (const c of C) { c.el.style.width = L.W + 'px'; c.el.style.height = H + 'px'; } // every card keeps the hero's size and is scaled, so it rasterises once
+  L.step = (small ? 0.64 : 0.72) * H * 9 / 16 / L.R * 180 / Math.PI; // degrees between neighbours: they overlap by about a quarter
+  L.cy = bottom - Math.max(small ? 12 : 16, (avail - H) * 0.3) - H / 2;
+  L.x = vw / 2; L.y = L.cy + L.R;
+}
+// where a card sits in the hand, o places from the centre; a hovered card's neighbours lean away to make room
+function fanAt(o, c) {
+  let a = o * L.step;
+  for (const j of C) if (j !== c && j.hv > 0.001) {
+    const d = wrapC(c.k - j.k, N);
+    a += j.hv * Math.sign(d) * L.step * 0.3 * Math.max(0, 1 - (Math.abs(d) - 1) / 3);
+  }
+  const ao = Math.abs(o), s = 1 - 0.05 * Math.min(ao, 5);
+  return {
+    a, s, r: L.R - (1 - s) * L.H / 2,                      // smaller cards keep their feet on the same curve
+    alpha: clamp01(5.4 - ao), z: 200 - Math.round(ao * 20) + (c.hv > 0.02 ? 60 : 0),
+    tilt: clamp(o * 1.5, -7, 7) + clamp(U.vel * -2.4, -10, 10) // turned a touch toward the centre, leaning with the spin
+  };
+}
+const persp = () => Math.max(800, Math.min(1500, innerWidth * 0.8));
+
+// odometer: each column springs to its target, so the digits roll past and settle
+const odo = $('#odo');
+odo.innerHTML = [0, 1, 2].map(() => `<span class="col"><span class="strip">${'01234567890'.split('').map(d => `<span>${d}</span>`).join('')}</span></span>`).join('');
+const strips = [...odo.querySelectorAll('.strip')];
+const cols = [{ p: 0, v: 0, w: 15 }, { p: 0, v: 0, w: 12 }, { p: 0, v: 0, w: 10 }]; // ones, tens, hundreds
+let target = 0;
+function stepOdo(dt, snap) {
+  const s = Math.min(dt, 40) / 1000;
+  cols.forEach((c, i) => {
+    const goal = Math.floor(target / Math.pow(10, i));
+    if (snap) { c.p = goal; c.v = 0; }
+    else { c.v += (c.w * c.w * (goal - c.p) - 2 * 0.55 * c.w * c.v) * s; c.p += c.v * s; }
+    const d = ((c.p % 10) + 10) % 10;
+    strips[2 - i].style.transform = `translateY(${-d}em)`;
+  });
+}
+
+// the shared chrome: counter out, the mark shrinks into the nav and turns ink as the window insets, nav and copy in
+const vars = {};
+const setVar = (k, v) => { v = Math.round(v * 1000) / 1000; if (vars[k] !== v) { vars[k] = v; stage.style.setProperty(k, v); } };
+function chrome(tFade, tUi, pz) {
+  const k = d => eo3((tUi - d) / 700);
+  setVar('--fade', 1 - eo3(tFade / 380)); setVar('--mk', clamp01(pz * 1.15));
+  setVar('--ui', k(0)); setVar('--ui2', k(160)); setVar('--ui3', k(320));
+  stage.classList.toggle('ui', tUi > 0);
+}
+function arrive(ts) { // the studio light comes up behind the cards
+  sky.style.opacity = eo3(ts / 520); sky.style.transform = `scale(${1.1 - 0.1 * spr(ts, 3.6, 0.9)})`;
+  if (ts > 0 && !REDUCED && !bd.src) { bd.src = bd.dataset.src; bd.play().catch(() => {}); }
+}
+function measure() {
+  const big = parseFloat(getComputedStyle(mark).fontSize), small = innerWidth <= 720 ? 22 : 28;
+  stage.style.setProperty('--shrink', Math.max(0, 1 - small / big).toFixed(3));
+  layout();
+}
+// one card's pose, relative to the panel; (x, y) is where its centre sits before the 3D part of the pose
+function place(c, x, y, tf, z, alpha) {
+  const s = c.el.style;
+  if (c.hidden) { s.visibility = ''; c.hidden = false; }
+  s.transform = `translate(${x - L.W / 2}px,${y - L.H / 2}px) ${tf}`;
+  if (c.z !== z) { s.zIndex = z; c.z = z; }
+  const a = Math.round(clamp01(alpha) * 1000) / 1000;
+  if (c.alpha !== a) { c.faces[0].style.opacity = c.faces[1].style.opacity = a; c.alpha = a; c.el.classList.toggle('off', a < 0.3); }
+}
+function hide(c) { if (!c.hidden) { c.el.style.visibility = 'hidden'; c.hidden = true; } }
+
+// ---------- 01 deal ----------
+// the reels are dealt into the top of a wheel: centre first, then right, left, right…
+const D = { GAP: 96, T0: 200, STEP: 12 };
+D.order = [0]; for (let k = 1; k <= N >> 1; k++) D.order.push(k, N - k);
+D.idx = {}; D.order.forEach((k, i) => { D.idx[k] = i; });
+D.Tland = D.T0 + (N - 1) * D.GAP + 420; // the last card is down
+D.Tbreath = D.Tland - 60; D.Trev = D.Tland + 420; D.Tzoom = D.Trev + 240;
+
+function dealFrame(t) {
+  const vw = innerWidth, vh = innerHeight, P = persp(), Cx = vw / 2, Cy = vh / 2;
+  const pz = spr(t - D.Tzoom - 120, 4.6, 0.86), pr = setPanel(pz);
+  const R0 = Math.min(vh * 0.34, vw * (vw <= 720 ? 0.42 : 0.22)), h0 = R0 * (vw <= 720 ? 0.54 : 0.5), P0x = vw / 2, P0y = vh / 2 + R0 * 0.42;
+  const breath = 1 + recoil(t - D.Tbreath, 0.075);
+  U.live = t > D.Tzoom + 900;
+  let landed = 0;
+  for (const c of C) {
+    const k = c.k, o0 = wrapC(k, N), i = D.idx[k];
+    const zc = spr(t - D.Tzoom - Math.abs(o0) * 30, 5.4, 0.74);                        // opens from the centre out
+    const f = fanAt(wrapC(k - U.pos, N), c);
+    const R = lerp(R0 * breath - h0 / 2, f.r, zc), k1 = lerp(h0 / L.H, f.s, zc);
+    const px = lerp(P0x, L.x + mouse.x * 14, zc), py = lerp(P0y, L.y, zc), a = lerp(o0 * D.STEP, f.a, zc);
+    const sx = px + R * Math.sin(rad(a)), sy = py - R * Math.cos(rad(a));
+    let x = sx, y = sy, rot = a, flip = 0, tip = 0, sc = 1, lift = 0, z = 100 + i;
+    const e = t - (D.T0 + i * D.GAP);
+    if (e <= 0) { // face down on the deck
+      x = P0x; y = P0y - (N - i) * 0.8; rot = 0; flip = 180; tip = 58; sc = 0.52; z = 1 + N - i;
+    } else {
+      // tossed toward you, flipped face up, overshooting the slot and recoiling back into it
+      const sp = spr(e, 13, 0.56), sr = spr(e - 30, 10, 0.5), sf = spr(e, 14, 0.8), ss = spr(e, 13, 0.48), air = Math.sin(Math.PI * clamp01(e / 430));
+      x = lerp(P0x, sx, sp); y = lerp(P0y, sy, sp);
+      rot = a * sr; flip = 180 * (1 - sf); tip = 58 * (1 - sf) - 16 * air; sc = lerp(0.52, 1, ss); lift = 180 * air;
+      z = e < 460 ? 500 + i : 100 + i;
+      if (e > 280) landed++;
+    }
+    if (zc > 0.3) z = f.z;
+    place(c, Cx - pr.l, Cy - pr.t, `perspective(${P}px) translate(${x - Cx}px,${y - Cy}px) rotate(${rot}deg) translateZ(${lift}px) rotateX(${tip}deg) rotateY(${flip + f.tilt * zc}deg) scale(${sc * k1})`, z, lerp(1, f.alpha, zc));
+  }
+  target = landed >= N ? 100 : Math.round(Math.floor(landed / 3) * 3 / N * 100); // the counter moves in chunks
+  const ts = t - D.Trev;
+  arrive(ts);
+  chrome(ts, t - D.Tzoom - 120, pz);
+}
+
+// ---------- 02 ring ----------
+// the reels lay into a tumbling ring; then it tips up to face you (a wheel, every card turned face up) and opens into the hand
+const G = { GAP: 118, T0: 220 };
+G.Tland = G.T0 + (N - 1) * G.GAP + 460; G.Tbreath = G.Tland - 40; G.Trev = G.Tland + 380; G.Ttip = G.Trev + 140; G.Topen = G.Ttip + 420;
+const ringSpin = t => -40 * (Math.min(t, G.Ttip) / 1000 + sprLag(t - G.Ttip, 4.4, 0.82)); // tumbling at 40°/s while it builds, coming to rest as it tips
+G.off = -ringSpin(G.Topen);                                                                 // the slots are turned so the first reel faces you as it opens
+
+function ringFrame(t) {
+  const vw = innerWidth, vh = innerHeight, vmin = Math.min(vw, vh), Cx = vw / 2, Cy = vh / 2;
+  const pz = spr(t - G.Topen - 60, 4.4, 0.86), pr = setPanel(pz);
+  const m = spr(t - G.Ttip, 4.4, 0.82);                                                  // the tip
+  const P = lerp(Math.max(380, Math.min(820, vw * 0.45)), persp(), m);                   // a wide lens while it tumbles, so the near cards loom
+  const cw0 = vmin * (vw <= 720 ? 0.12 : 0.1), ch0 = cw0 * 16 / 9, R0 = N * cw0 * 1.32 / (2 * Math.PI);
+  const breath = 1 + recoil(t - G.Tbreath, 0.07, 10, 4);
+  const ax = lerp(-24 + 3 * Math.sin(t / 1300), 90, m), az = lerp(-15 + 2 * Math.cos(t / 1700), 0, m), zC = lerp(-150, 0, m);
+  const spin = G.off + ringSpin(t);
+  U.live = t > G.Topen + 900;
+  const cX = Math.cos(rad(ax)), sX = Math.sin(rad(ax)), cZ = Math.cos(rad(az)), sZ = Math.sin(rad(az));
+  let landed = 0;
+  for (const c of C) {
+    const k = c.k, e = t - (G.T0 + k * G.GAP);
+    if (e <= 0) { hide(c); continue; }
+    if (e > 300) landed++;
+    const lay = spr(e, 12.5, 0.55), f = spr(e, 11, 0.68);                                 // comes in from outside, turned, and springs into its slot
+    const o = wrapC(k - U.pos, N), fan = fanAt(o, c);
+    const u = spr(t - G.Topen - Math.abs(o) * 30, 5, 0.78), th = wrapC(k * 360 / N + spin, 360); // opens into the hand, centre first
+    const r = lerp((R0 * breath + (1 - lay) * 120) * lerp(1, 1.08, m), fan.r, u);
+    const k1 = lerp(ch0 * lerp(1, 1.12, m) / L.H, fan.s, u), a = lerp(th, fan.a, u);
+    let x = r * Math.sin(rad(a)), y = 0, z = r * Math.cos(rad(a));                         // where it is in the camera's space, for paint order and fading
+    [x, y] = [x * cZ - y * sZ, x * sZ + y * cZ]; [y, z] = [y * cX - z * sX, y * sX + z * cX];
+    const alpha = lerp(Math.min(clamp01(e / 140), clamp01((P - 60 - (z + zC)) / 240)), fan.alpha, u);
+    place(c, Cx - pr.l, Cy - pr.t,
+      `perspective(${P}px) translate3d(${(L.x - Cx + mouse.x * 14) * u}px,${(L.y - Cy) * u}px,${zC}px) rotateX(${ax}deg) rotateZ(${az}deg) rotateY(${a}deg) translateZ(${r}px) rotateX(${-90 * m}deg) rotateY(${-70 * (1 - f) + fan.tilt * u}deg) rotateX(${40 * (1 - f)}deg) scale(${(0.55 + 0.45 * lay) * k1})`,
+      u > 0.3 ? fan.z : 1000 + Math.round(z), alpha);
+  }
+  target = landed >= N ? 100 : Math.round(Math.floor(landed / 3) * 3 / N * 100);
+  const ts = t - G.Trev;
+  arrive(ts);
+  chrome(ts, t - G.Topen - 60, pz);
+}
+
+// ---------- clips: the poster first, the muted clip crossfades in while a card is hovered, focused or tapped ----------
+let hot = null, playing = null;
+function play(c) {
+  if (playing === c) return;
+  const was = playing; playing = c;
+  if (was) { was.el.classList.remove('on'); setTimeout(() => { if (playing !== was) was.v.pause(); }, 520); }
+  if (!c) return;
+  if (!c.v.src) c.v.src = c.v.dataset.src; // preload none: nothing loads until asked
+  const p = c.v.play(); if (p) p.catch(() => {});
+  if (c.v.readyState > 2 && !c.v.paused) c.el.classList.add('on');
+}
+function centre(c) { U.goal = Math.round(U.pos + wrapC(c.k - U.pos, N)); U.idle = 0; }
+
+// ---------- build, loop, controls ----------
+function build() {
+  REELS.forEach(([slug, brand, what, col], k) => {
+    const el = document.createElement('button');
+    el.className = 'card'; el.type = 'button';
+    el.setAttribute('aria-label', `${brand} reel: ${what}`);
+    el.innerHTML = `<span class="lift"><span class="face front" style="--c:${col}"><img alt="" src="../../assets/reels/${slug}.jpg" decoding="async">` +
+      `<video muted playsinline loop preload="none" poster="../../assets/reels/${slug}.jpg" data-src="../../assets/reels/${slug}.mp4" aria-hidden="true"></video>` +
+      `<span class="play"></span><span class="tag"><b>${brand}</b><i>${what}</i></span><span class="bar"></span></span>` +
+      `<span class="face back"><img alt="" src="../../assets/img/nav-mark-white.png"></span></span>`;
+    deck.appendChild(el);
+    const c = { k, el, lift: el.firstChild, faces: [...el.firstChild.children], v: el.querySelector('video'), bar: el.querySelector('.bar'), hv: 0, hvv: 0 };
+    c.v.addEventListener('playing', () => { if (playing === c) el.classList.add('on'); });
+    el.addEventListener('pointerenter', e => { if (e.pointerType === 'touch' || U.drag || !U.live) return; hot = c; play(c); U.idle = 0; });
+    el.addEventListener('pointerleave', e => { if (e.pointerType === 'touch' || hot !== c) return; hot = null; if (document.activeElement !== el) play(null); });
+    el.addEventListener('focus', () => { if (!el.matches(':focus-visible')) return; hot = c; play(c); centre(c); });
+    el.addEventListener('blur', () => { if (hot === c) hot = null; if (playing === c) play(null); });
+    el.addEventListener('click', e => {
+      if (U.moved) return;                                         // the end of a drag, not a click
+      if (U.ptype === 'touch' && e.detail) { play(playing === c ? null : c); hot = playing; } // touch: a tap toggles the clip
+      else if (!e.detail) play(playing === c ? null : c);          // keyboard: enter or space toggles it
+      centre(c);
+    });
+    C.push(c);
+  });
+}
+// hover lifts a card out of the hand on a spring; the playing clip draws its progress along the foot
+function hand(dt) {
+  const s = Math.min(dt, 40) / 1000;
+  for (const c of C) {
+    const goal = c === hot && !U.drag ? 1 : 0;
+    c.hvv += (169 * (goal - c.hv) - 2 * 0.72 * 13 * c.hvv) * s; c.hv += c.hvv * s;
+    const lt = `translateY(${(-c.hv * L.H * 0.055).toFixed(2)}px) scale(${(1 + 0.035 * c.hv).toFixed(4)})`;
+    if (lt !== c.lt) { c.lift.style.transform = lt; c.lt = lt; }
+  }
+  if (playing && playing.v.duration) playing.bar.style.transform = `scaleX(${(playing.v.currentTime / playing.v.duration).toFixed(4)})`;
+}
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!started) return;
+  const dt = Math.min(64, now - last); last = now;
+  mouse.x += (mouse.tx - mouse.x) * 0.06; mouse.y += (mouse.ty - mouse.y) * 0.06;
+  const t = now - t0;
+  stepUser(dt); hand(dt);
+  if (concept === 1) dealFrame(t); else ringFrame(t);
+  if (stage.classList.contains('live') !== U.live) { stage.classList.toggle('live', U.live); deck.inert = !U.live; }
+  // left alone, the hand passes the next reel to the centre every few seconds
+  if (U.live && !REDUCED && !hot && !playing && !U.press && Math.abs(U.goal - U.pos) < 0.02 && !document.hidden) {
+    if ((U.idle += dt) > 4200) { U.goal += 1; U.idle = 0; }
+  } else U.idle = 0;
+  stepOdo(dt, false);
+}
+function start(c) {
+  concept = c; target = 0; last = performance.now();
+  U.pos = U.goal = U.vel = U.idle = 0; U.drag = U.press = null; U.live = false; stage.classList.remove('dragging', 'live'); deck.inert = true;
+  hot = null; play(null); C.forEach(k => { k.hv = k.hvv = 0; });
+  t0 = REDUCED ? last - 20000 : last; // reduced motion: straight to the hero
+  stepOdo(0, true);
+  stage.className = 'c' + c;
+  document.querySelectorAll('.switch [data-c]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.c === c)));
+  try { history.replaceState(null, '', '#' + c); } catch (e) {}
+}
+document.querySelectorAll('.switch [data-c]').forEach(b => b.addEventListener('click', () => start(+b.dataset.c)));
+$('#replay').addEventListener('click', () => start(concept));
+addEventListener('keydown', e => { if (e.metaKey || e.ctrlKey || e.altKey) return; if (e.key === '1' || e.key === '2') start(+e.key); else if (e.key.toLowerCase() === 'r') start(concept); });
+addEventListener('pointermove', e => { mouse.tx = e.clientX / innerWidth * 2 - 1; mouse.ty = e.clientY / innerHeight * 2 - 1; });
+addEventListener('resize', measure);
+const menu = $('#menu'), links = $('#links');
+menu.addEventListener('click', () => { const open = links.classList.toggle('open'); menu.setAttribute('aria-expanded', String(open)); });
+links.addEventListener('click', () => { links.classList.remove('open'); menu.setAttribute('aria-expanded', 'false'); });
+if (TOUCH) $('#hint').textContent = 'Swipe · tap a reel to play';
+
+// ---------- moving the hand by hand ----------
+// it always settles with a card dead centre: a damped spring toward the goal, carrying whatever speed a flick gave it
+function stepUser(dt) {
+  if (U.drag) { U.vel *= Math.exp(-dt / 140); return; }
+  const s = Math.min(dt, 40) / 1000, w = 8.5;
+  U.vel += (w * w * (U.goal - U.pos) - 2 * 0.8 * w * U.vel) * s; U.pos += U.vel * s;
+  if (Math.abs(U.pos) > N * 4) { const n = Math.round(U.pos / N) * N; U.pos -= n; U.goal -= n; }
+}
+const cardPx = () => rad(L.step) * L.R; // a drag of one neighbour's spacing moves one card
+panel.addEventListener('pointerdown', e => {
+  U.moved = false; U.ptype = e.pointerType;
+  if (!U.live || e.button !== 0) return;
+  U.press = { id: e.pointerId, x: e.clientX, x0: e.clientX, t: performance.now() };
+});
+panel.addEventListener('pointermove', e => {
+  const d = U.press; if (!d || e.pointerId !== d.id) return;
+  if (!U.drag) {
+    if (Math.abs(e.clientX - d.x0) < 7) return;
+    U.drag = d; U.moved = true; U.vel = 0; d.x = e.clientX; hot = null; play(null);
+    try { panel.setPointerCapture(e.pointerId); } catch (err) {}
+    stage.classList.add('dragging');
+  }
+  const now = performance.now(), dc = -(e.clientX - d.x) / cardPx();
+  U.pos += dc; U.vel = clamp(U.vel * 0.6 + dc / Math.max(16, now - d.t) * 1000 * 0.4, -16, 16); // a hard flick tops out at a turn a second
+  d.x = e.clientX; d.t = now;
+});
+const endDrag = e => {
+  const d = U.press; if (!d || e.pointerId !== d.id) return;
+  if (U.drag) {
+    if (performance.now() - d.t > 90) U.vel = 0; // held still before letting go: no flick
+    U.goal = Math.round(U.pos + U.vel * 0.24);
+  }
+  U.drag = U.press = null; U.idle = 0; stage.classList.remove('dragging');
+};
+panel.addEventListener('pointerup', endDrag); panel.addEventListener('pointercancel', endDrag);
+// a scroll or swipe on a trackpad: about one card a notch
+addEventListener('wheel', e => {
+  if (!U.live) return;
+  e.preventDefault();
+  U.wheel += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  const n = Math.trunc(U.wheel / 80);
+  if (n) { U.wheel -= n * 80; U.goal = Math.round(U.goal) + clamp(n, -2, 2); U.idle = 0; }
+  clearTimeout(U.wt); U.wt = setTimeout(() => { U.wheel = 0; }, 200);
+}, { passive: false });
+addEventListener('keydown', e => {
+  if (!U.live || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+  e.preventDefault(); U.goal = Math.round(U.goal) + (e.key === 'ArrowRight' ? 1 : -1); U.idle = 0;
+  if (deck.contains(document.activeElement)) C[wrap(U.goal, N)].el.focus({ preventScroll: true }); // focus follows the centre card
+});
+
+// fonts and the first posters first, then go
+build();
+const fonts = Promise.all([`400 20px 'Inter Tight'`, `500 20px 'Inter Tight'`, `600 40px 'Inter Tight'`, `400 20px 'DM Mono'`, `500 20px 'DM Mono'`].map(f => document.fonts.load(f)));
+const posters = Promise.all([...deck.querySelectorAll('.front img')].map(i => i.decode().catch(() => {})));
+Promise.race([Promise.all([fonts, posters]), new Promise(r => setTimeout(r, 3000))]).then(() => {
+  measure();
+  started = true;
+  start(location.hash === '#2' ? 2 : 1);
+});
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
