@@ -6,6 +6,7 @@ Two loading animations that turn into a site's hero, in one HTML file.
 - **02 Ring** — cards lay into a tumbling 3D ring one after another, then the camera dives inside and the ring becomes a curved gallery behind the hero.
 
 Open `index.html` in any browser, no build step. Switch loaders with the pill at the top (or keys `1` / `2`, `R` to replay).
+Once a carousel lands, spin it by hand: click and drag (or swipe on touch) and it glides on with momentum, scroll or swipe on a trackpad to nudge it about a card at a time, or use the arrow keys.
 Motion runs on damped springs; the card thumbnails, card back and sky are all drawn in the browser at load. Fonts load from Google Fonts.
 With reduced motion turned on, the page goes straight to the hero.
 
