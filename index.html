@@ -148,7 +148,7 @@ function stepOdo(dt, snap) {
 }
 
 // ---------- the ring ----------
-const G = { N: SITES.length, GAP: 90, T0: 260 };
+const G = { N: SITES.length, GAP: 90, T0: 260, guard: 0 };
 G.STEP = 360 / G.N;
 G.Tland = G.T0 + (G.N - 1) * G.GAP + 460; G.Tbreath = G.Tland - 40; G.Trev = G.Tland + 300; G.Tdive = G.Trev + 700;
 
@@ -159,7 +159,7 @@ function ringFrame(t, dt) {
   const dg = spr(t - G.Tdive, 4.2, 0.86);
   const cw0 = vmin * 0.13, ch0 = cw0 * 9 / 16, R0 = N * cw0 * 1.3 / (2 * Math.PI);
   const cw1 = vw * 0.3, ch1 = cw1 * 9 / 16, R1 = N * cw1 * 1.05 / (2 * Math.PI); // desktop-size, close together
-  const D = cw1 * P / (vw * 0.58);                                       // the card in front fills 58% of the width, its neighbours bleed off
+  const D = cw1 * P / (vw * 0.5);                                        // the card in front fills half the width, its neighbours bleed off
   const breath = 1 + recoil(t - G.Tbreath, 0.07, 10, 4);
   const zC = lerp(-200, P + R1 - D, dg) - move * D * 0.12;              // ends inside the ring; pulls back a touch while it travels
   // tipped back a little once inside: the sides sweep up
@@ -169,7 +169,8 @@ function ringFrame(t, dt) {
   const vel = (sp - lastSp) / Math.max(1, dt) * 1000; lastSp = sp;
   move += (clamp01((Math.abs(vel) - 4) / 90) * (U.live ? 1 : 0) - move) * (1 - Math.exp(-dt / 120)); // eases in and out of a move
   const settled = eo3((t - G.Tdive - 1500) / 1100);                    // the ring has come to rest
-  Object.assign(RING, { P, oy: eye * vh, ty: lerp(0, vh * 0.01, dg) + eye * vh * (1 - D / P) - R1 * Math.sin(rad(7)) * dg, zC, ax, az, sp, vel: U.live ? vel : 0, move, t, live: U.live, ready: true });
+  const tyRaw = lerp(0, vh * 0.01, dg) + eye * vh * (1 - D / P) - R1 * Math.sin(rad(7)) * dg;
+  Object.assign(RING, { P, oy: eye * vh, ty: tyRaw + G.guard, zC, ax, az, sp, vel: U.live ? vel : 0, move, t, live: U.live, ready: true });
   const cX = Math.cos(rad(ax)), sX = Math.sin(rad(ax)), cZ = Math.cos(rad(az)), sZ = Math.sin(rad(az));
   let landed = 0;
   for (let k = 0; k < N; k++) {
@@ -182,9 +183,13 @@ function ringFrame(t, dt) {
     const q = rad(th + sp); let x = r * Math.sin(q), y = 0, z = r * Math.cos(q);
     [x, y] = [x * cZ - y * sZ, x * sZ + y * cZ]; [y, z] = [y * cX - z * sX, y * sX + z * cX];
     const alpha = Math.min(clamp01(e / 140), clamp01((P - (z + zC) - 0.22 * P) / (0.2 * P))); // fade cards before they reach the camera
-    // every screen bends on the ring's own circle, with a hairline edge; glare once settled, strongest in front of the sun
-    Object.assign(c, { on: alpha > 0.01, th, r, cw, ch, f, s: 0.55 + 0.45 * lay, alpha, rad: Math.max(3, cw * 0.016), b: Math.max(1, cw * 0.0016), glare: settled * Math.pow(clamp01(-z / r), 6) });
+    // every screen bends on the ring's own circle; glare once settled, strongest in front of the sun
+    Object.assign(c, { on: alpha > 0.01, th, r, cw, ch, f, s: 0.55 + 0.45 * lay, alpha, rad: Math.max(3, cw * 0.016), glare: settled * Math.pow(clamp01(-z / r), 6) });
   }
+  // drops at once when a top edge would reach the header, eases back up when the pointer lets it
+  const want = clearance(vw, vh, P, eye * vh, tyRaw, zC, ax, az, sp) * dg;
+  G.guard = want > G.guard ? want : G.guard + (want - G.guard) * (1 - Math.exp(-dt / 260));
+  RING.ty = tyRaw + G.guard;
   target = landed >= N ? 100 : Math.round(Math.floor(landed / 2) * 2 / N * 100); // the counter moves in chunks
   const ts = t - G.Trev;
   const rise = spr(ts + 120, 2.4, 0.96);                                 // the light and the clouds come up from below the frame
@@ -199,6 +204,29 @@ function ringFrame(t, dt) {
   stage.style.setProperty('--ui', k(0)); stage.style.setProperty('--ui2', k(180));
   stage.classList.toggle('ui', t > G.Tdive + 800);
   labels(sp);
+}
+
+// the screens stay clear of the header: no top edge may rise above SAFE.y (just under the wordmark and nav)
+const SAFE = { y: 0 };
+function measureSafe() { const n = $('.name'); SAFE.y = n.offsetTop + n.offsetHeight + 20; RING.band = SAFE.y / innerHeight; }
+// how far the ring must drop (world units) so every top edge stays below SAFE.y, projected as the WebGL camera draws it
+function clearance(vw, vh, P, oy, ty, zC, ax, az, sp) {
+  const cX = Math.cos(rad(-ax)), sX = Math.sin(rad(-ax)), cZ = Math.cos(rad(-az)), sZ = Math.sin(rad(-az));
+  let need = 0;
+  for (const c of RING.cards) {
+    if (!c.on || c.alpha < 0.05) continue;
+    const half = c.cw / c.r / 2;
+    for (let i = 0; i <= 4; i++) {                                     // five points along the top edge
+      const a = rad(c.th + sp) + (i / 2 - 1) * half;
+      let x = c.r * Math.sin(a), y = c.ch / 2, z = c.r * Math.cos(a);
+      [x, y] = [x * cZ - y * sZ, x * sZ + y * cZ]; [y, z] = [y * cX - z * sX, y * sX + z * cX];
+      const dz = P - (z + zC); if (dz < 1) continue;
+      const sx = vw / 2 + P * x / dz; if (sx < -40 || sx > vw + 40) continue;
+      const sy = vh / 2 + oy - P * (y - ty + oy) / dz;
+      need = Math.max(need, (SAFE.y - sy) * dz / P);
+    }
+  }
+  return need;
 }
 
 // the project facing you, and its neighbours for prev / next
@@ -223,7 +251,7 @@ function frame(now) {
   stepOdo(dt, false);
 }
 function start() {
-  spin = 0; target = 0; last = performance.now();
+  spin = 0; target = 0; last = performance.now(); G.guard = 0; measureSafe();
   U.off = 0; U.vel = 0; U.drag = null; U.live = false; U.tgt = null; stage.classList.remove('dragging');
   t0 = REDUCED ? last - 20000 : last; // reduced motion: straight to the header
   stepOdo(0, true);
@@ -231,6 +259,7 @@ function start() {
 }
 addEventListener('keydown', e => { if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey) start(); });
 addEventListener('pointermove', e => { mouse.tx = e.clientX / innerWidth * 2 - 1; mouse.ty = e.clientY / innerHeight * 2 - 1; });
+addEventListener('resize', measureSafe);
 
 // ---------- turning the ring by hand ----------
 // the ring rides a spring toward a project: it swings there quickly, overshoots a touch and settles.
@@ -325,7 +354,7 @@ void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
 const CARD_FS = `
-uniform sampler2D uMap; uniform vec3 uColor; uniform float uLoaded, uAlpha, uGlare, uRad, uB, uW, uH;
+uniform sampler2D uMap; uniform vec3 uColor; uniform float uLoaded, uAlpha, uGlare, uRad, uW, uH;
 varying vec2 vUv;
 float box(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
 void main() {
@@ -333,7 +362,6 @@ void main() {
   float aa = fwidth(d), mask = 1.0 - smoothstep(-aa, aa, d);
   if (mask <= 0.0) discard;
   vec3 col = mix(uColor, texture2D(uMap, vUv).rgb, uLoaded);
-  col = mix(col, vec3(0.118, 0.102, 0.086), 0.55 * (1.0 - smoothstep(uB - aa, uB + aa, -d))); // the hairline edge
   float top = 1.0 - vUv.y, g = uGlare * mix(0.8, 0.22, smoothstep(0.0, 0.12, top)) * (1.0 - smoothstep(0.12, 0.32, top));
   col = 1.0 - (1.0 - col) * (1.0 - vec3(1.0, 0.95, 0.85) * g);  // the sun's glare, screened over the top of the glass
   gl_FragColor = vec4(col, uAlpha * mask);
@@ -343,7 +371,7 @@ ringGroup.rotation.order = 'XZY'; ringScene.add(ringGroup);
 const cardGeo = new THREE.PlaneGeometry(1, 1, 48, 1);
 const cards = RING.sites.map(([slug, , col], k) => {
   const u = { uMap: { value: null }, uColor: { value: new THREE.Color(col) }, uLoaded: { value: 0 }, uAlpha: { value: 1 }, uGlare: { value: 0 },
-    uRad: { value: 4 }, uB: { value: 1 }, uW: { value: 1 }, uH: { value: 1 }, uR: { value: 1 }, uArc: { value: 0.1 }, uMove: { value: 0 }, uTime: { value: 0 }, uK: { value: k } };
+    uRad: { value: 4 }, uW: { value: 1 }, uH: { value: 1 }, uR: { value: 1 }, uArc: { value: 0.1 }, uMove: { value: 0 }, uTime: { value: 0 }, uK: { value: k } };
   loader.load(`assets/gallery/${slug}.jpg`, t => { t.anisotropy = 4; u.uMap.value = t; u.uLoaded.value = 1; });
   const mesh = new THREE.Mesh(cardGeo, new THREE.ShaderMaterial({ uniforms: u, vertexShader: CARD_VS, fragmentShader: CARD_FS, transparent: true, side: THREE.DoubleSide, extensions: { derivatives: true } }));
   mesh.frustumCulled = false;
@@ -366,7 +394,7 @@ function placeRing(vw, vh) {
     c.pivot.rotation.y = s.th * D2R; c.seat.position.z = s.r;
     c.seat.rotation.set(-40 * (1 - s.f) * D2R, -70 * (1 - s.f) * D2R, 0); c.seat.scale.setScalar(s.s);
     const u = c.u; u.uW.value = s.cw; u.uH.value = s.ch; u.uR.value = s.r; u.uArc.value = s.cw / s.r; u.uAlpha.value = s.alpha;
-    u.uGlare.value = s.glare; u.uRad.value = s.rad; u.uB.value = s.b; u.uMove.value = R.move; u.uTime.value = R.t;
+    u.uGlare.value = s.glare; u.uRad.value = s.rad; u.uMove.value = R.move; u.uTime.value = R.t;
   });
 }
 
@@ -426,13 +454,13 @@ const GRADIENT = pass(`uniform sampler2D uP, uVel; uniform vec2 uTexel; varying 
   { uP: { value: null }, uVel: { value: null }, uTexel: { value: new THREE.Vector2() } });
 const FADE = pass(`uniform sampler2D uTex; uniform float uK; varying vec2 vUv; void main() { gl_FragColor = uK * texture2D(uTex, vUv); }`, { uTex: { value: null }, uK: { value: 0.8 } });
 // the warp: each pixel of the frame is fetched from where the fluid has pushed it, colours split a little where it moves fast
-const WARP = pass(`uniform sampler2D uScene, uVel; uniform float uStrength; varying vec2 vUv;
+const WARP = pass(`uniform sampler2D uScene, uVel; uniform float uStrength, uBand; varying vec2 vUv;
   void main() {
-    vec2 off = texture2D(uVel, vUv).xy * uStrength;
+    vec2 off = texture2D(uVel, vUv).xy * uStrength * smoothstep(uBand, uBand + 0.05, 1.0 - vUv.y); // still in the header band
     vec4 c = texture2D(uScene, vUv - off);
     c.r = texture2D(uScene, vUv - off * 1.12).r; c.b = texture2D(uScene, vUv - off * 0.88).b;
     gl_FragColor = c;
-  }`, { uScene: { value: null }, uVel: { value: null }, uStrength: { value: 0.00012 } });
+  }`, { uScene: { value: null }, uVel: { value: null }, uStrength: { value: 0.00012 }, uBand: { value: 0 } });
 const quad = new THREE.Mesh(FULL, WARP), quadScene = new THREE.Scene(); quad.frustumCulled = false; quadScene.add(quad);
 const draw = (mat, target) => { quad.material = mat; renderer.setRenderTarget(target); renderer.render(quadScene, ortho); };
 
@@ -500,7 +528,7 @@ let lastT = performance.now();
   renderer.autoClear = true;
   if (!REDUCED) { stirFromRing(); stepFluid(dt); }
   WARP.uniforms.uScene.value = frameRT.texture; WARP.uniforms.uVel.value = velA.texture;
-  WARP.uniforms.uStrength.value = REDUCED ? 0 : 0.00012;
+  WARP.uniforms.uStrength.value = REDUCED ? 0 : 0.00012; WARP.uniforms.uBand.value = RING.band || 0;
   draw(WARP, null);
 })(lastT);
 </script>
